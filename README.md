@@ -12,7 +12,7 @@
 | Langkah | Aksi |
 |---------|------|
 | 1 | Beri koin ke player via command |
-| 2 | Pegang **Nether Star** di tangan utama |
+| 2 | Pegang **Amethyst Shard** di tangan utama |
 | 3 | Klik kanan **Chest** biasa |
 | 4 | Pilih **Pull 1x** atau **Pull 10x** |
 | 5 | Tunggu animasi rolling (~4 detik) |
