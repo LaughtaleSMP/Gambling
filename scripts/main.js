@@ -43,20 +43,16 @@ import {
   bulkEntryToIndividual, getLeaderboard,
 } from "./data.js";
 
-// ── Kunci pending currency offline ───────────────────────────
 const K_PEND_GEM  = "gacha:pend_gem:";
 const K_PEND_COIN = "gacha:pend_coin:";
 
-// ── Whitelist chest ──────────────────────────────────────────
 const K_REG_CHESTS = "gacha:reg_chests";
 
 function getAllowedChests() { return dpGet(K_REG_CHESTS, []); }
 function saveAllowedChests(list) { dpSet(K_REG_CHESTS, list); }
 
-// ── Idle guards per chest (key → intervalId) ─────────────────
 const idleGuards = new Map();
 
-// ── Suara area ───────────────────────────────────────────────
 const SFX_AREA_RADIUS = 20;
 function sfxArea(location, dimension, sfxObj, excludeId = null, radius = SFX_AREA_RADIUS) {
   for (const p of world.getPlayers()) {
@@ -124,15 +120,11 @@ function nearbyValidChestCached(player) {
 // ═══════════════════════════════════════════════════════════
 // IDLE CHEST MANAGEMENT
 // ═══════════════════════════════════════════════════════════
-
-// Border chest 3×9 searah jarum jam:
-// Baris atas (0→8) → sisi kanan (17) → baris bawah terbalik (26→18) → sisi kiri (9)
 const IDLE_BORDER    = [0,1,2,3,4,5,6,7,8, 17, 26,25,24,23,22,21,20,19,18, 9];
-// Slot interior baris tengah (bukan tepi, bukan center)
 const IDLE_INNER     = [10,11,12,14,15,16];
-const IDLE_CENTER    = 13; // slot tengah absolut (row 1, col 4)
-const IDLE_ANIM_INT  = 3;  // tick per frame (~6-7 fps)
-const IDLE_COMET_LEN = 5;  // panjang ekor komet pada border
+const IDLE_CENTER    = 13;
+const IDLE_ANIM_INT  = 3;
+const IDLE_COMET_LEN = 5;
 
 function startIdleForChest(key, dimId, loc, type) {
   if (idleGuards.has(key)) return;
@@ -146,20 +138,17 @@ function startIdleForChest(key, dimId, loc, type) {
     } catch { return null; }
   };
 
-  // Gambar frame pertama segera
   const c0 = getContainer();
   if (c0) drawIdleFrame(c0, key, type, 0);
 
   let frame = 0;
 
   const intervalId = system.runInterval(() => {
-    // Sesi aktif — guard sesi yang handle
     if (activeChests.has(key)) return;
 
     const c = getContainer();
     if (!c) { stopIdleForChest(key); return; }
 
-    // Gambar frame animasi berikutnya
     drawIdleFrame(c, key, type, frame);
     frame++;
   }, IDLE_ANIM_INT);
@@ -182,43 +171,36 @@ function setSlot(container, key, slot, typeId, label) {
   container.setItem(slot, mkItem(typeId, label));
   if (!chestExpected.has(key)) chestExpected.set(key, new Array(27).fill(null));
   chestExpected.get(key)[slot] = { typeId, nameTag: MARK + (label ?? "") };
-  // snapshotExpected TIDAK dipanggil di sini — dipanggil sekali di akhir drawIdleFrame
-  // agar tidak terjadi 27 dpSet() per frame animasi
 }
 
 function fillGlass(container, key, id) {
   for (let i = 0; i < 27; i++) setSlot(container, key, i, id, " ");
 }
 
-// Render satu frame animasi idle ke container.
 function drawIdleFrame(container, key, type, frame) {
   if (!container) return;
   const isPt = type === "PARTICLE";
 
-  // Palet warna per tipe
   const bg    = isPt ? "minecraft:purple_stained_glass_pane"  : "minecraft:light_blue_stained_glass_pane";
   const hiMid = isPt ? "minecraft:magenta_stained_glass_pane" : "minecraft:cyan_stained_glass_pane";
   const hiTip = isPt ? "minecraft:pink_stained_glass_pane"    : "minecraft:white_stained_glass_pane";
   const hiIn  = isPt ? "minecraft:blue_stained_glass_pane"    : "minecraft:light_gray_stained_glass_pane";
   const icon  = isPt ? "minecraft:amethyst_shard"             : "minecraft:nether_star";
 
-  // ── Border: komet berputar searah jarum jam ──────────────
   const head = frame % IDLE_BORDER.length;
   for (let bi = 0; bi < IDLE_BORDER.length; bi++) {
     const slot = IDLE_BORDER[bi];
     const dist = (bi - head + IDLE_BORDER.length) % IDLE_BORDER.length;
     let g;
-    if      (dist === 0)            g = hiTip;  // kepala komet (paling terang)
-    else if (dist < IDLE_COMET_LEN) g = hiMid;  // badan komet
-    else                            g = bg;      // latar belakang
+    if      (dist === 0)            g = hiTip;
+    else if (dist < IDLE_COMET_LEN) g = hiMid;
+    else                            g = bg;
     setSlot(container, key, slot, g, " ");
   }
 
-  // ── Interior: kedip lambat setiap 10 frame ───────────────
   const innerOn = Math.floor(frame / 10) % 2 === 0;
   for (const s of IDLE_INNER) setSlot(container, key, s, innerOn ? hiIn : bg, " ");
 
-  // ── Center: ikon + label bergilir setiap 25 frame ────────
   const ptL = [
     "§r§5§l✦ GACHA PARTIKEL",
     "§r§d§l◈ Bayar dengan Gem",
@@ -232,11 +214,9 @@ function drawIdleFrame(container, key, type, frame) {
   const lbl = (isPt ? ptL : eqL)[Math.floor(frame / 25) % 3];
   setSlot(container, key, IDLE_CENTER, icon, lbl);
 
-  // Simpan snapshot sekali di akhir frame (Bug #2 fix: bukan di tiap setSlot)
   snapshotExpected(key);
 }
 
-// Wrapper statis (frame 0) — untuk one-shot draw di luar loop animasi.
 function drawIdle(container, key, type) {
   drawIdleFrame(container, key, type, 0);
 }
@@ -316,7 +296,6 @@ async function reveal10x(container, results, key, player, type) {
 
 function startGuard(container, key, ownerId) {
   const guardId = system.runInterval(() => {
-    // [PATCH 7] Cek baik memory maupun DP
     const stillActive = activeChests.has(key) || isSessionOwner(key, ownerId);
     if (!stillActive) { chestExpected.delete(key); system.clearRun(guardId); return; }
     const exp = chestExpected.get(key); if (!exp) return;
@@ -339,7 +318,7 @@ function startGuard(container, key, ownerId) {
         }
       }
     } catch {}
-  }, 2); // [PATCH 7] interval 2 tick (lebih cepat dari CFG.GUARD_INT)
+  }, 2);
   return guardId;
 }
 
@@ -589,11 +568,8 @@ async function executeGachaIntent(player, intent, block) {
     return;
   }
 
-  // [FIX BUG-3] Capture saldo setelah deduct (bukan dari registry yang bisa stale).
-  // Dipakai untuk offline refund agar nilai yang dikembalikan akurat.
   const balAfterDeduct = type === "PARTICLE" ? getGem(player) : getCoin(player);
 
-  // Re-check race condition setelah deduct
   if (activeChests.has(key)) {
     sfx(player, SFX.BROKE);
     await withLock(player.id, async () => refund(type, player, cost));
@@ -627,7 +603,7 @@ async function executeGachaIntent(player, intent, block) {
   }
 
   activeChests.set(key, player.id);
-  persistLock(key, player.id); // [PATCH 3] simpan ke DP agar survive restart
+  persistLock(key, player.id);
   const c0 = fresh();
   if (c0) { stopIdleForChest(key); drawIdle(c0, key, type); startGuard(c0, key, player.id); }
   sfx(player, SFX.READY);
@@ -645,14 +621,9 @@ async function executeGachaIntent(player, intent, block) {
   try {
     await waitChestOpen(player, chestBlock);
 
-    // [FIX BUG-2] Ganti pola lama validateDisc → consumeDisc (TOCTOU) dengan
-    // validateAndConsumeDisc yang atomic. Dua player dengan kode uses=1 tidak
-    // bisa keduanya mendapat diskon karena validate dan consume dilakukan sekaligus.
     if (disc) {
       pendingDisc.delete(player.id);
       validateAndConsumeDisc(disc.code, type, player.id);
-      // Tidak perlu tracking discConsumed lagi — rollback sudah tidak relevan
-      // karena consume atomic. Jika disc tidak valid, fungsi mengembalikan null.
     }
 
     const c = fresh();
@@ -664,13 +635,9 @@ async function executeGachaIntent(player, intent, block) {
     if (isStillOnline) {
       await withLock(player.id, async () => refund(type, player, cost));
     } else {
-      // [FIX BUG-3] Gunakan balAfterDeduct (saldo aktual pasca-deduct) sebagai base,
-      // bukan registry yang bisa tertinggal karena debounce syncPlayerData.
-      // balAfterDeduct + cost = saldo sebelum pull = nilai yang benar untuk dikembalikan.
       try {
         const pendKey  = type === "PARTICLE" ? (K_PEND_GEM + player.id) : (K_PEND_COIN + player.id);
         const existing = dpGet(pendKey, null);
-        // Jika ada pending admin sebelumnya, jangan timpa; tambahkan cost ke atasnya.
         const refundVal = existing !== null ? existing + cost : balAfterDeduct + cost;
         dpSet(pendKey, refundVal);
         console.warn(`[Gacha] Offline refund pending for ${player.name}: set to ${refundVal} ${unit}`);
@@ -687,11 +654,9 @@ async function executeGachaIntent(player, intent, block) {
       player.sendMessage(`§c[Gacha] ⚠ Error! §f${cost} ${unit} dikembalikan.`);
     }
   } finally {
-    clearLock(key); // [PATCH 3] hapus dari DP dan memory sekaligus
-    // (clearLock sudah memanggil activeChests.delete dan chestExpected.delete)
+    clearLock(key);
     try { const c = fresh(); if (c) clrBox(c); } catch {}
     lastPull.set(player.id, system.currentTick);
-    // Restart idle animasi setelah sesi selesai
     const regEntry = getAllowedChests().find(c => c.key === key);
     if (regEntry) system.runTimeout(() => startIdleForChest(key, regEntry.dimId, { x: regEntry.x, y: regEntry.y, z: regEntry.z }, regEntry.type), 5);
   }
@@ -945,15 +910,15 @@ async function showAdminMenu(player) {
         `§7Chest Terdaftar: §a${regChests.length}\n` +
         (pendImps ? `§e⚠ Pending import: ${pendImps} player\n` : "") + HR
       )
-      .button("§l Kelola Gem Player")        // 0
-      .button("§l Kelola Koin Player")       // 1
-      .button("§l Buat Kode Diskon")         // 2
-      .button("§l Hapus Kode Diskon")        // 3
-      .button("§l Lihat Semua Kode")         // 4
-      .button("§l Export / Import Semua")    // 5
-      .button("§l Cara Daftarkan Chest")     // 6
-      .button("§l Kelola Chest Terdaftar")   // 7
-      .button("§l Kembali");                 // 8
+      .button("§l Kelola Gem Player")
+      .button("§l Kelola Koin Player")
+      .button("§l Buat Kode Diskon")
+      .button("§l Hapus Kode Diskon")
+      .button("§l Lihat Semua Kode")
+      .button("§l Export / Import Semua")
+      .button("§l Cara Daftarkan Chest")
+      .button("§l Kelola Chest Terdaftar")
+      .button("§l Kembali");
 
     sfx(player, SFX.ADMIN);
     const res = await form.show(player);
@@ -1277,8 +1242,6 @@ async function showAdminManageChests(adminPlayer) {
       const fresh = getAllowedChests().filter(c => c.key !== target.key);
       saveAllowedChests(fresh);
       stopIdleForChest(target.key);
-      // [FIX BUG-6] Hapus snapshot dan lock DP agar global guard tidak terus
-      // memulihkan konten idle ke chest yang sudah tidak terdaftar.
       dpDel("gacha:chest_snap:" + target.key);
       dpDel("gacha:chest_lock:" + target.key);
       adminPlayer.sendMessage(
@@ -1292,13 +1255,6 @@ async function showAdminManageChests(adminPlayer) {
 // ═══════════════════════════════════════════════════════════
 // EXPORT / IMPORT UI
 // ═══════════════════════════════════════════════════════════
-// ─── Export / Import UI ────────────────────────────────────────────────────
-// Alur baru:
-//   Export → langsung tampilkan ModalFormData berisi satu string panjang GSALL5.
-//   Import → ModalFormData paste string → konfirmasi → terapkan.
-//   Hanya player dengan gem > 0 atau partikel yang masuk ke string export.
-// ──────────────────────────────────────────────────────────────────────────
-
 async function showExportImportAllUI(adminPlayer) {
   if (!adminPlayer.hasTag(CFG.ADMIN_TAG)) { adminPlayer.sendMessage("§c[!] Akses ditolak."); return; }
   while (true) {
@@ -1326,11 +1282,10 @@ async function showExportImportAllUI(adminPlayer) {
   }
 }
 
-// Export: langsung tampilkan string dalam text field. Tidak ada list nama di console.
 async function showBulkExportUI(adminPlayer) {
   if (!adminPlayer.hasTag(CFG.ADMIN_TAG)) { adminPlayer.sendMessage("§c[!] Akses ditolak."); return; }
   const { entries, full } = buildBulkExport();
-  logBulkToConsole({ entries, full }); // hanya log string, tidak ada per-player list
+  logBulkToConsole({ entries, full });
 
   if (!entries.length) {
     await new ActionFormData().title("§l§3  Export Data  §r")
@@ -1339,7 +1294,6 @@ async function showBulkExportUI(adminPlayer) {
     return;
   }
 
-  // Tampilkan langsung sebagai satu string di text field
   await new ModalFormData()
     .title(`§l§3  Export Data — ${entries.length} player  §r`)
     .textField(
@@ -1349,7 +1303,6 @@ async function showBulkExportUI(adminPlayer) {
     .show(adminPlayer);
 }
 
-// Import: paste string GSALL5 → konfirmasi → terapkan langsung via GUI
 async function showBulkImportUI(adminPlayer) {
   if (!adminPlayer.hasTag(CFG.ADMIN_TAG)) { adminPlayer.sendMessage("§c[!] Akses ditolak."); return; }
 
@@ -1388,7 +1341,6 @@ async function showBulkImportUI(adminPlayer) {
   );
 }
 
-// Daftar pending import — bisa dibatalkan per player
 async function showPendingImportList(adminPlayer) {
   const reg     = getPlayerReg();
   const pending = Object.entries(reg)
@@ -1428,30 +1380,40 @@ async function showPendingImportList(adminPlayer) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// ACTION BAR
+// ACTION BAR — tampil sekali saat pertama kali memegang amethyst
 // ═══════════════════════════════════════════════════════════
+const _triggerHolders = new Set();
+
 system.runInterval(() => {
-  const now = system.currentTick;
   for (const player of world.getPlayers()) {
-    const held = player.getComponent("minecraft:equippable")?.getEquipment(EquipmentSlot.Mainhand)?.typeId ?? "";
-    if (held !== CFG.TRIGGER) {
-      if (lastActionBar.has(player.id)) { lastActionBar.delete(player.id); chestCache.delete(player.id); }
+    const held      = player.getComponent("minecraft:equippable")?.getEquipment(EquipmentSlot.Mainhand)?.typeId ?? "";
+    const isHolding  = held === CFG.TRIGGER;
+    const wasHolding = _triggerHolders.has(player.id);
+
+    if (!isHolding) {
+      if (wasHolding) {
+        _triggerHolders.delete(player.id);
+        chestCache.delete(player.id);
+        lastActionBar.delete(player.id);
+      }
       continue;
     }
-    const near = nearbyValidChestCached(player);
-    let msg;
-    if (!near) {
-      msg = `§7Cari Chest  §8|  §5Amethyst §7(PT)  §8|  §cCrying Obs §7(EQ)  §8|  §eKlik kanan §7-> Hub`;
-    } else {
-      const ctype = getChestType(near);
-      if (activeChests.has(ck(near)))  msg = `§c[!] Chest sedang digunakan...`;
-      else if (ctype === "PARTICLE")   msg = `§5[PARTIKEL] §bKlik  §71x:§b${CFG.PT_COST_1}G  §710x:§b${CFG.PT_COST_10}G`;
-      else                             msg = `§6[PERALATAN] §eKlik  §71x:§e${CFG.EQ_COST_1}K  §710x:§e${CFG.EQ_COST_10}K`;
+
+    if (!wasHolding) {
+      _triggerHolders.add(player.id);
+      const near = nearbyValidChestCached(player);
+      let msg;
+      if (!near) {
+        msg = `§7Cari Chest  §8|  §5Amethyst §7(PT)  §8|  §cCrying Obs §7(EQ)  §8|  §eKlik kanan §7-> Hub`;
+      } else {
+        const ctype = getChestType(near);
+        if (activeChests.has(ck(near)))  msg = `§c[!] Chest sedang digunakan...`;
+        else if (ctype === "PARTICLE")   msg = `§5[PARTIKEL] §bKlik  §71x:§b${CFG.PT_COST_1}G  §710x:§b${CFG.PT_COST_10}G`;
+        else                             msg = `§6[PERALATAN] §eKlik  §71x:§e${CFG.EQ_COST_1}K  §710x:§e${CFG.EQ_COST_10}K`;
+      }
+      lastActionBar.set(player.id, { msg, tick: system.currentTick });
+      try { player.onScreenDisplay.setActionBar(msg); } catch {}
     }
-    const cached = lastActionBar.get(player.id);
-    if (cached?.msg === msg && now - cached.tick < CFG.ACTIONBAR_REFRESH) continue;
-    lastActionBar.set(player.id, { msg, tick: now });
-    try { player.onScreenDisplay.setActionBar(msg); } catch {}
   }
 }, CFG.ACTIONBAR_INT);
 
@@ -1462,16 +1424,13 @@ world.afterEvents.worldInitialize.subscribe(() => {
   if (!world.scoreboard.getObjective(CFG.GEM_OBJ))  world.scoreboard.addObjective(CFG.GEM_OBJ, "Gem");
   if (!world.scoreboard.getObjective(CFG.COIN_OBJ)) world.scoreboard.addObjective(CFG.COIN_OBJ, "Koin");
 
-  // [PATCH 4a] Inisialisasi security module
   initSecurity(
-    mkItem,                                       // fungsi mkItem dari main.js
-    (dimId) => world.getDimension(dimId),         // helper getDimension
+    mkItem,
+    (dimId) => world.getDimension(dimId),
   );
 
-  // [PATCH 4b] Guard drop item dari chest
   registerItemDropGuard();
 
-  // [PATCH 4c] Restart idle animasi untuk semua chest terdaftar
   system.runTimeout(() => {
     for (const c of getAllowedChests()) {
       startIdleForChest(c.key, c.dimId, { x: c.x, y: c.y, z: c.z }, c.type);
@@ -1502,7 +1461,6 @@ world.afterEvents.playerSpawn.subscribe(({ player, initialSpawn }) => {
     setScore(CFG.COIN_OBJ, player, existingCoin);
   }
 
-  // Terapkan pending gem/coin di T+100, sync di T+120 (setelah pending applied)
   system.runTimeout(() => {
     const live = world.getPlayers().find(p => p.id === player.id);
     if (!live) return;
@@ -1543,7 +1501,6 @@ world.afterEvents.playerSpawn.subscribe(({ player, initialSpawn }) => {
 world.beforeEvents.playerBreakBlock.subscribe(event => {
   const { block, player } = event;
 
-  // [PATCH 8a] Blokir penghancuran chest gacha aktif
   if (block.typeId === "minecraft:chest") {
     const key = ck(block);
     if (activeChests.has(key) || dpGet("gacha:chest_lock:" + key, null)) {
@@ -1551,7 +1508,6 @@ world.beforeEvents.playerBreakBlock.subscribe(event => {
       system.run(() => player.sendMessage("§c⚠ Chest gacha aktif tidak bisa dihancurkan!"));
       return;
     }
-    // Blokir penghancuran chest terdaftar (idle) oleh non-admin
     if (isValidChest(block) && !player.hasTag(CFG.ADMIN_TAG)) {
       event.cancel = true;
       system.run(() => player.sendMessage("§c⚠ Chest gacha terdaftar tidak bisa dihancurkan!\n§7Minta admin untuk menghapus daftarnya terlebih dahulu."));
@@ -1559,7 +1515,6 @@ world.beforeEvents.playerBreakBlock.subscribe(event => {
     }
   }
 
-  // [PATCH 8b] Blokir penghancuran block BASE di bawah chest terdaftar
   const { x, y, z } = block.location;
   try {
     const above = block.dimension.getBlock({ x, y: y + 1, z });
@@ -1578,22 +1533,15 @@ world.afterEvents.playerLeave.subscribe(({ playerId }) => {
   chestCache.delete(playerId);
   lastActionBar.delete(playerId);
   pendingChestInteract.delete(playerId);
-  // Bug #4 fix: gunakan clearLock agar DP lock juga dihapus.
-  // Tanpa ini, player lain diblokir masuk chest selama beberapa tick
-  // karena dpGet(K_CHEST_LOCK) masih menunjuk ke owner yang sudah disconnect.
+  _triggerHolders.delete(playerId);
   for (const [key, id] of activeChests)
     if (id === playerId) clearLock(key);
 });
-
-// [PATCH 6] Handler entitySpawn lama dihapus.
-// registerItemDropGuard() di [PATCH 4b] sudah menangani ini,
-// ditambah cek radius 2 blok dari chest terdaftar.
 
 world.beforeEvents.playerLeave.subscribe(({ player }) => {
   try { syncPlayerData(player); } catch {}
 });
 
-// Klik kanan di udara dengan amethyst → Hub Menu
 world.afterEvents.itemUse.subscribe(ev => {
   const player = ev.source;
   if (ev.itemStack?.typeId !== CFG.TRIGGER) return;
@@ -1612,19 +1560,18 @@ world.afterEvents.itemUse.subscribe(ev => {
   });
 });
 
-// Klik kanan pada chest gacha
 registerSecureChestHandler(
-  getChestType,           // fungsi dari main.js
-  isChestCandidate,       // fungsi dari main.js
-  isValidChest,           // fungsi dari main.js
-  showAdminRegisterChest, // fungsi dari main.js
-  startGacha,             // fungsi dari main.js
+  getChestType,
+  isChestCandidate,
+  isValidChest,
+  showAdminRegisterChest,
+  startGacha,
   {
-    activePlayers,        // Map dari config.js
-    pendingChestInteract, // Map dari config.js
-    lastPull,             // Map dari config.js
-    SFX,                  // objek SFX dari config.js
-    sfx,                  // fungsi sfx dari data.js
+    activePlayers,
+    pendingChestInteract,
+    lastPull,
+    SFX,
+    sfx,
   }
 );
 
